@@ -1,384 +1,303 @@
 #!/usr/bin/env python3
 """
-Backup and Restore Module for PostgreSQL
-Provides crash-safe restore capabilities with section-based restoration.
+Backup and Restore Script for PostgreSQL
+Provides crash-safe backup and restore operations with section-based restoration
 """
 
+import logging
+import sys
 import os
 import subprocess
-import logging
-import tempfile
+import argparse
 from datetime import datetime
+from database_connections import DatabaseConnections
 from config import POSTGRES_CONFIG
 
 logger = logging.getLogger(__name__)
 
 class BackupRestore:
     def __init__(self):
-        self.pg_host = POSTGRES_CONFIG['host']
-        self.pg_port = POSTGRES_CONFIG['port']
-        self.pg_user = POSTGRES_CONFIG['user']
-        self.pg_password = POSTGRES_CONFIG['password']
-        self.pg_db = POSTGRES_CONFIG['dbname']
+        self.db_connections = DatabaseConnections()
+        self.backup_dir = "backups"
+        self._ensure_backup_dir()
     
-    def _get_pg_env(self):
-        """Get PostgreSQL environment variables"""
-        env = os.environ.copy()
-        env['PGPASSWORD'] = self.pg_password
-        return env
+    def _ensure_backup_dir(self):
+        """Ensure backup directory exists"""
+        if not os.path.exists(self.backup_dir):
+            os.makedirs(self.backup_dir)
+            logger.info(f"Created backup directory: {self.backup_dir}")
     
-    def create_backup(self, output_file=None, format='custom'):
-        """
-        Create a PostgreSQL backup
-        
-        Args:
-            output_file: Output file path (optional)
-            format: Backup format ('custom', 'plain', 'directory')
-        
-        Returns:
-            str: Path to backup file
-        """
+    def create_backup(self, filename=None):
+        """Create a PostgreSQL backup"""
         try:
-            if output_file is None:
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                output_file = f"backup_{self.pg_db}_{timestamp}.dump"
+            if filename is None:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"backup_{timestamp}.dump"
+            
+            filepath = os.path.join(self.backup_dir, filename)
             
             # Build pg_dump command
             cmd = [
                 'pg_dump',
-                f'--host={self.pg_host}',
-                f'--port={self.pg_port}',
-                f'--username={self.pg_user}',
-                f'--dbname={self.pg_db}',
-                f'--format={format}',
-                f'--file={output_file}',
-                '--verbose'
+                '-Fc',  # Custom format
+                '-h', POSTGRES_CONFIG['host'],
+                '-p', str(POSTGRES_CONFIG['port']),
+                '-U', POSTGRES_CONFIG['user'],
+                '-d', POSTGRES_CONFIG['dbname'],
+                '-f', filepath
             ]
             
-            logger.info(f"Creating backup: {output_file}")
-            logger.info(f"Command: {' '.join(cmd)}")
+            # Set password environment variable
+            env = os.environ.copy()
+            env['PGPASSWORD'] = POSTGRES_CONFIG['password']
             
-            # Execute backup
-            result = subprocess.run(
-                cmd,
-                env=self._get_pg_env(),
-                capture_output=True,
-                text=True,
-                check=True
-            )
+            logger.info(f"Creating backup: {filepath}")
+            result = subprocess.run(cmd, env=env, capture_output=True, text=True)
             
-            logger.info("✓ Backup created successfully")
-            logger.info(f"Backup file: {output_file}")
-            
-            return output_file
-            
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Backup failed: {e}")
-            logger.error(f"stderr: {e.stderr}")
-            raise
-        except Exception as e:
-            logger.error(f"Backup failed: {e}")
-            raise
-    
-    def restore_backup(self, backup_file, target_db=None, sections=None):
-        """
-        Restore PostgreSQL backup with optional section-based restoration
-        
-        Args:
-            backup_file: Path to backup file
-            target_db: Target database name (optional)
-            sections: List of sections to restore (optional)
-        
-        Returns:
-            bool: True if successful
-        """
-        try:
-            if target_db is None:
-                target_db = self.pg_db
-            
-            if sections is None:
-                # Full restore
-                return self._restore_full(backup_file, target_db)
+            if result.returncode == 0:
+                logger.info(f"✓ Backup created successfully: {filepath}")
+                return filepath
             else:
-                # Section-based restore
-                return self._restore_sections(backup_file, target_db, sections)
+                logger.error(f"✗ Backup failed: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Backup creation failed: {e}")
+            return None
+    
+    def restore_backup(self, backup_file, target_db=None, sections=None, crash_safe=False):
+        """Restore PostgreSQL backup"""
+        try:
+            if not os.path.exists(backup_file):
+                logger.error(f"Backup file not found: {backup_file}")
+                return False
+            
+            if target_db is None:
+                target_db = POSTGRES_CONFIG['dbname']
+            
+            logger.info(f"Restoring backup: {backup_file} to database: {target_db}")
+            
+            if crash_safe:
+                return self._crash_safe_restore(backup_file, target_db, sections)
+            else:
+                return self._full_restore(backup_file, target_db)
                 
         except Exception as e:
             logger.error(f"Restore failed: {e}")
-            raise
+            return False
     
-    def _restore_full(self, backup_file, target_db):
+    def _full_restore(self, backup_file, target_db):
         """Perform full restore"""
         try:
+            # Drop and recreate database
+            self._recreate_database(target_db)
+            
+            # Restore backup
             cmd = [
                 'pg_restore',
-                f'--host={self.pg_host}',
-                f'--port={self.pg_port}',
-                f'--username={self.pg_user}',
-                f'--dbname={target_db}',
-                '--verbose',
+                '-h', POSTGRES_CONFIG['host'],
+                '-p', str(POSTGRES_CONFIG['port']),
+                '-U', POSTGRES_CONFIG['user'],
+                '-d', target_db,
                 '--clean',
                 '--if-exists',
                 backup_file
             ]
             
-            logger.info(f"Performing full restore to database: {target_db}")
-            logger.info(f"Command: {' '.join(cmd)}")
+            env = os.environ.copy()
+            env['PGPASSWORD'] = POSTGRES_CONFIG['password']
             
-            result = subprocess.run(
-                cmd,
-                env=self._get_pg_env(),
-                capture_output=True,
-                text=True,
-                check=True
-            )
+            result = subprocess.run(cmd, env=env, capture_output=True, text=True)
             
-            logger.info("✓ Full restore completed successfully")
-            return True
-            
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Full restore failed: {e}")
-            logger.error(f"stderr: {e.stderr}")
-            raise
-    
-    def _restore_sections(self, backup_file, target_db, sections):
-        """Perform section-based restore"""
-        try:
-            logger.info(f"Performing section-based restore to database: {target_db}")
-            logger.info(f"Sections: {', '.join(sections)}")
-            
-            success_sections = []
-            failed_sections = []
-            
-            for section in sections:
-                try:
-                    if self._restore_section(backup_file, target_db, section):
-                        success_sections.append(section)
-                        logger.info(f"✓ Section '{section}' restored successfully")
-                    else:
-                        failed_sections.append(section)
-                        logger.error(f"✗ Section '{section}' restore failed")
-                except Exception as e:
-                    failed_sections.append(section)
-                    logger.error(f"✗ Section '{section}' restore failed: {e}")
-            
-            # Summary
-            logger.info(f"Section restore completed:")
-            logger.info(f"  Successful: {', '.join(success_sections)}")
-            if failed_sections:
-                logger.error(f"  Failed: {', '.join(failed_sections)}")
+            if result.returncode == 0:
+                logger.info(f"✓ Full restore completed successfully")
+                return True
+            else:
+                logger.error(f"✗ Full restore failed: {result.stderr}")
                 return False
-            
-            return True
-            
+                
         except Exception as e:
-            logger.error(f"Section-based restore failed: {e}")
-            raise
-    
-    def _restore_section(self, backup_file, target_db, section):
-        """Restore a specific section"""
-        try:
-            cmd = [
-                'pg_restore',
-                f'--host={self.pg_host}',
-                f'--port={self.pg_port}',
-                f'--username={self.pg_user}',
-                f'--dbname={target_db}',
-                f'--section={section}',
-                '--verbose',
-                backup_file
-            ]
-            
-            result = subprocess.run(
-                cmd,
-                env=self._get_pg_env(),
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            
-            return True
-            
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Section '{section}' restore failed: {e}")
+            logger.error(f"Full restore failed: {e}")
             return False
     
-    def get_backup_contents(self, backup_file):
-        """Get list of contents in backup file"""
+    def _crash_safe_restore(self, backup_file, target_db, sections=None):
+        """Perform crash-safe restore with sections"""
         try:
-            cmd = [
-                'pg_restore',
-                '--list',
-                backup_file
-            ]
+            if sections is None:
+                sections = ['pre-data', 'data', 'post-data']
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True
-            )
+            logger.info(f"Starting crash-safe restore with sections: {sections}")
             
-            return result.stdout.splitlines()
+            # Step 1: Pre-data (schema, functions, procedures)
+            if 'pre-data' in sections:
+                logger.info("Restoring pre-data section...")
+                if not self._restore_section(backup_file, target_db, 'pre-data'):
+                    logger.error("Pre-data restore failed")
+                    return False
             
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to list backup contents: {e}")
-            return []
-    
-    def create_toc_file(self, backup_file, toc_file=None):
-        """Create a table of contents file for the backup"""
-        try:
-            if toc_file is None:
-                toc_file = backup_file.replace('.dump', '.toc')
+            # Step 2: Data (table data)
+            if 'data' in sections:
+                logger.info("Restoring data section...")
+                if not self._restore_section(backup_file, target_db, 'data'):
+                    logger.error("Data restore failed")
+                    return False
             
-            cmd = [
-                'pg_restore',
-                '--list',
-                f'--file={toc_file}',
-                backup_file
-            ]
+            # Step 3: Post-data (indexes, constraints, triggers)
+            if 'post-data' in sections:
+                logger.info("Restoring post-data section...")
+                if not self._restore_section(backup_file, target_db, 'post-data'):
+                    logger.error("Post-data restore failed")
+                    return False
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            
-            logger.info(f"✓ TOC file created: {toc_file}")
-            return toc_file
-            
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to create TOC file: {e}")
-            return None
-    
-    def restore_with_toc(self, backup_file, toc_file, target_db):
-        """Restore using a TOC file for selective restoration"""
-        try:
-            cmd = [
-                'pg_restore',
-                f'--host={self.pg_host}',
-                f'--port={self.pg_port}',
-                f'--username={self.pg_user}',
-                f'--dbname={target_db}',
-                f'--use-list={toc_file}',
-                '--verbose',
-                backup_file
-            ]
-            
-            logger.info(f"Restoring with TOC file: {toc_file}")
-            
-            result = subprocess.run(
-                cmd,
-                env=self._get_pg_env(),
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            
-            logger.info("✓ TOC-based restore completed successfully")
-            return True
-            
-        except subprocess.CalledProcessError as e:
-            logger.error(f"TOC-based restore failed: {e}")
-            return False
-    
-    def crash_safe_restore(self, backup_file, target_db):
-        """
-        Perform crash-safe restore with section-based approach
-        
-        This method implements the crash-safe restore strategy:
-        1. Restore pre-data (schema, functions, etc.)
-        2. Restore data
-        3. Restore post-data (indexes, constraints, etc.)
-        
-        If any step fails, you can resume from that point.
-        """
-        try:
-            logger.info("Starting crash-safe restore process...")
-            
-            # Step 1: Pre-data (schema, functions, etc.)
-            logger.info("Step 1: Restoring pre-data section...")
-            if not self._restore_section(backup_file, target_db, 'pre-data'):
-                logger.error("Pre-data restore failed")
-                return False
-            
-            # Step 2: Data
-            logger.info("Step 2: Restoring data section...")
-            if not self._restore_section(backup_file, target_db, 'data'):
-                logger.error("Data restore failed")
-                logger.info("You can resume from this point by running:")
-                logger.info(f"  python backup_restore.py --resume-data {backup_file} {target_db}")
-                return False
-            
-            # Step 3: Post-data (indexes, constraints, etc.)
-            logger.info("Step 3: Restoring post-data section...")
-            if not self._restore_section(backup_file, target_db, 'post-data'):
-                logger.error("Post-data restore failed")
-                logger.info("You can resume from this point by running:")
-                logger.info(f"  python backup_restore.py --resume-post-data {backup_file} {target_db}")
-                return False
-            
-            logger.info("✓ Crash-safe restore completed successfully!")
+            logger.info("✓ Crash-safe restore completed successfully")
             return True
             
         except Exception as e:
             logger.error(f"Crash-safe restore failed: {e}")
             return False
     
-    def resume_data_restore(self, backup_file, target_db):
-        """Resume data restoration if it failed during crash-safe restore"""
-        return self._restore_section(backup_file, target_db, 'data')
+    def _restore_section(self, backup_file, target_db, section):
+        """Restore a specific section"""
+        try:
+            cmd = [
+                'pg_restore',
+                '-h', POSTGRES_CONFIG['host'],
+                '-p', str(POSTGRES_CONFIG['port']),
+                '-U', POSTGRES_CONFIG['user'],
+                '-d', target_db,
+                f'--section={section}',
+                '--clean',
+                '--if-exists',
+                backup_file
+            ]
+            
+            env = os.environ.copy()
+            env['PGPASSWORD'] = POSTGRES_CONFIG['password']
+            
+            result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                logger.info(f"✓ {section} section restored successfully")
+                return True
+            else:
+                logger.error(f"✗ {section} section restore failed: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"{section} section restore failed: {e}")
+            return False
     
-    def resume_post_data_restore(self, backup_file, target_db):
-        """Resume post-data restoration if it failed during crash-safe restore"""
-        return self._restore_section(backup_file, target_db, 'post-data')
+    def _recreate_database(self, db_name):
+        """Drop and recreate database"""
+        try:
+            # Connect to postgres database to drop/recreate target database
+            admin_dsn = (
+                f"host={POSTGRES_CONFIG['host']} "
+                f"port={POSTGRES_CONFIG['port']} "
+                f"dbname=postgres "
+                f"user={POSTGRES_CONFIG['user']} "
+                f"password={POSTGRES_CONFIG['password']}"
+            )
+            
+            with self.db_connections.get_postgres_connection() as conn:
+                conn.autocommit = True
+                with conn.cursor() as cur:
+                    # Terminate connections to target database
+                    cur.execute(f"""
+                        SELECT pg_terminate_backend(pid)
+                        FROM pg_stat_activity
+                        WHERE datname = '{db_name}' AND pid <> pg_backend_pid()
+                    """)
+                    
+                    # Drop database if exists
+                    cur.execute(f"DROP DATABASE IF EXISTS {db_name}")
+                    
+                    # Create new database
+                    cur.execute(f"CREATE DATABASE {db_name}")
+                    
+            logger.info(f"Database {db_name} recreated successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to recreate database {db_name}: {e}")
+            return False
+    
+    def list_backups(self):
+        """List available backups"""
+        try:
+            backups = []
+            for file in os.listdir(self.backup_dir):
+                if file.endswith('.dump'):
+                    filepath = os.path.join(self.backup_dir, file)
+                    size = os.path.getsize(filepath)
+                    modified = datetime.fromtimestamp(os.path.getmtime(filepath))
+                    backups.append({
+                        'filename': file,
+                        'size': size,
+                        'modified': modified
+                    })
+            
+            if backups:
+                logger.info("Available backups:")
+                for backup in sorted(backups, key=lambda x: x['modified'], reverse=True):
+                    logger.info(f"  {backup['filename']} ({backup['size']} bytes, {backup['modified']})")
+            else:
+                logger.info("No backups found")
+                
+            return backups
+            
+        except Exception as e:
+            logger.error(f"Failed to list backups: {e}")
+            return []
 
 def main():
-    """Command-line interface for backup and restore operations"""
-    import argparse
-    
+    """Main function"""
     parser = argparse.ArgumentParser(description='PostgreSQL Backup and Restore Tool')
-    parser.add_argument('--backup', action='store_true', help='Create backup')
-    parser.add_argument('--restore', help='Restore from backup file')
+    parser.add_argument('--backup', action='store_true', help='Create a backup')
+    parser.add_argument('--restore', metavar='FILE', help='Restore from backup file')
+    parser.add_argument('--list', action='store_true', help='List available backups')
+    parser.add_argument('--crash-safe', action='store_true', help='Use crash-safe restore')
+    parser.add_argument('--sections', nargs='+', choices=['pre-data', 'data', 'post-data'],
+                       help='Specify sections for crash-safe restore')
     parser.add_argument('--target-db', help='Target database for restore')
-    parser.add_argument('--crash-safe', action='store_true', help='Perform crash-safe restore')
-    parser.add_argument('--resume-data', action='store_true', help='Resume data restoration')
-    parser.add_argument('--resume-post-data', action='store_true', help='Resume post-data restoration')
-    parser.add_argument('--sections', nargs='+', help='Specific sections to restore')
     
     args = parser.parse_args()
+    
+    # Setup logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
     
     backup_restore = BackupRestore()
     
     try:
         if args.backup:
-            backup_file = backup_restore.create_backup()
-            print(f"Backup created: {backup_file}")
-            
-        elif args.restore:
-            if args.crash_safe:
-                success = backup_restore.crash_safe_restore(args.restore, args.target_db or backup_restore.pg_db)
-            elif args.resume_data:
-                success = backup_restore.resume_data_restore(args.restore, args.target_db or backup_restore.pg_db)
-            elif args.resume_post_data:
-                success = backup_restore.resume_post_data_restore(args.restore, args.target_db or backup_restore.pg_db)
-            elif args.sections:
-                success = backup_restore.restore_backup(args.restore, args.target_db, args.sections)
+            filename = backup_restore.create_backup()
+            if filename:
+                logger.info(f"Backup created: {filename}")
             else:
-                success = backup_restore.restore_backup(args.restore, args.target_db)
-            
-            if success:
-                print("Restore completed successfully")
-            else:
-                print("Restore failed")
+                logger.error("Backup failed")
                 sys.exit(1)
-                
+        
+        elif args.restore:
+            success = backup_restore.restore_backup(
+                args.restore,
+                target_db=args.target_db,
+                sections=args.sections,
+                crash_safe=args.crash_safe
+            )
+            if not success:
+                sys.exit(1)
+        
+        elif args.list:
+            backup_restore.list_backups()
+        
         else:
             parser.print_help()
             
     except Exception as e:
-        print(f"Error: {e}")
+        logger.error(f"Operation failed: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

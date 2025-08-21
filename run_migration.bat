@@ -1,43 +1,56 @@
 @echo off
-setlocal
-cd /d %~dp0
+REM Sybase to PostgreSQL Migration Runner
+REM This batch file helps run the migration on Windows
 
-echo === Sybase -> PostgreSQL Migration ===
+echo ========================================
+echo Sybase to PostgreSQL Migration Tool
+echo ========================================
 
-if not exist .env (
-  echo No .env found. Creating from env_example.txt ...
-  copy /Y env_example.txt .env >nul
-  echo Created .env. Review and edit credentials if needed.
-)
-
-echo.
-echo Installing Python dependencies...
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+REM Check if Python is installed
+python --version >nul 2>&1
 if errorlevel 1 (
-  echo Dependency installation failed.
-  exit /b 1
+    echo ERROR: Python is not installed or not in PATH
+    echo Please install Python 3.7+ and try again
+    pause
+    exit /b 1
 )
 
+REM Check if .env file exists
+if not exist ".env" (
+    echo WARNING: .env file not found
+    echo Creating .env file from template...
+    copy env_example.txt .env
+    echo Please edit .env file with your database credentials
+    echo Then run this script again
+    pause
+    exit /b 1
+)
+
+REM Install dependencies if needed
+echo Checking dependencies...
+pip install -r requirements.txt
+
+REM Run test setup first
 echo.
-echo Verifying setup...
+echo Running test setup...
 python test_setup.py
 if errorlevel 1 (
-  echo Setup verification failed. Fix issues above and re-run.
-  exit /b 1
+    echo Test setup failed. Please fix the issues and try again.
+    pause
+    exit /b 1
 )
 
+REM Run main migration
 echo.
-echo Running migration...
+echo Running main migration...
 python main_migration.py
-set EXITCODE=%ERRORLEVEL%
-
-echo.
-if %EXITCODE% NEQ 0 (
-  echo Migration failed with exit code %EXITCODE%.
-  exit /b %EXITCODE%
-) else (
-  echo Migration finished successfully.
+if errorlevel 1 (
+    echo Migration failed. Please check the logs.
+    pause
+    exit /b 1
 )
 
-endlocal 
+echo.
+echo Migration completed successfully!
+echo You can now run scheduled sync with: python scheduled_sync.py
+pause 
