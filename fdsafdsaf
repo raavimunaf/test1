@@ -1,0 +1,146 @@
+
+---
+
+## **2. Create a Sample Table in Sybase**
+
+```sql
+-- Connect to Sybase
+isql -U sa -P StrongPass1 -S localhost:5000
+
+use testdb
+go
+
+create table employees (
+    id int primary key,
+    name varchar(100),
+    dept varchar(50),
+    salary numeric(10,2),
+    updated_at datetime default getdate()
+)
+go
+
+insert into employees (id, name, dept, salary) values
+(1, 'Alice', 'HR', 55000.00),
+(2, 'Bob', 'IT', 75000.00),
+(3, 'Charlie', 'Finance', 62000.00)
+go
+```
+
+---
+
+## **3. Extract Data from Sybase (Python test)**
+
+We’ll use **pyodbc** for Sybase.
+
+```python
+import pyodbc
+import psycopg2
+
+# Sybase connection
+sybase_conn = pyodbc.connect("DRIVER={FreeTDS};SERVER=localhost;PORT=5000;UID=sa;PWD=StrongPass1;DATABASE=testdb")
+syb_cur = sybase_conn.cursor()
+
+# Postgres connection
+pg_conn = psycopg2.connect("host=localhost dbname=testdb user=postgres password=StrongPass2")
+pg_cur = pg_conn.cursor()
+
+# Create same table in Postgres
+pg_cur.execute("""
+CREATE TABLE IF NOT EXISTS employees (
+    id INT PRIMARY KEY,
+    name VARCHAR(100),
+    dept VARCHAR(50),
+    salary NUMERIC(10,2),
+    updated_at TIMESTAMP DEFAULT NOW()
+)
+""")
+pg_conn.commit()
+
+# Fetch from Sybase
+syb_cur.execute("SELECT id, name, dept, salary, updated_at FROM employees")
+rows = syb_cur.fetchall()
+
+# Insert into Postgres
+for row in rows:
+    pg_cur.execute("""
+        INSERT INTO employees (id, name, dept, salary, updated_at)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          dept = EXCLUDED.dept,
+          salary = EXCLUDED.salary,
+          updated_at = EXCLUDED.updated_at
+    """, row)
+
+pg_conn.commit()
+print("Data migrated from Sybase → PostgreSQL successfully!")
+
+pg_cur.close()
+pg_conn.close()
+syb_cur.close()
+sybase_conn.close()
+```
+
+---
+
+## **4. Verify Migration**
+
+In PostgreSQL:
+
+```bash
+psql -h localhost -U postgres -d testdb -c "SELECT * FROM employees;"
+```
+
+Should show the 3 records copied from Sybase.
+
+---
+
+## **5. Test Update Sync**
+
+Update a row in Sybase and re-run the Python script:
+
+```sql
+update employees set salary = 80000 where id = 2
+go
+```
+
+Run Python script again → Postgres should reflect salary `80000`.
+
+---
+
+## **6. Crash-Safe Restore Simulation (Postgres → Postgres)**
+
+Dump target DB:
+
+```bash
+pg_dump -Fc -h localhost -U postgres -d testdb -f dump_file.dump
+```
+
+Restore with sections:
+
+```bash
+# Schema
+pg_restore -h localhost -U postgres -d testdb2 --section=pre-data dump_file.dump
+
+# Data
+pg_restore -h localhost -U postgres -d testdb2 --section=data -j 4 dump_file.dump
+
+# Indexes & constraints
+pg_restore -h localhost -U postgres -d testdb2 --section=post-data dump_file.dump
+```
+
+If it **crashes** in step 2 (data), you can:
+
+* rerun only missing tables using `pg_restore -L toc.list`
+* OR truncate and rerun `--section=data`.
+
+---
+
+# ✅ Final Notes
+
+* This plan ensures you **start small with a test schema**, then scale.
+* You can wrap the Python script into a **cron job** or **service** for ongoing sync.
+* For **initial dump**, use Python or `bcp` (Sybase bulk export) → then load into Postgres.
+* For **ongoing changes**, decide between polling (`updated_at`), triggers, or change tables.
+
+---
