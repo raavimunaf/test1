@@ -37,87 +37,55 @@ This document provides a comprehensive guide for migrating data from Sybase to P
 
 ```sql
 -- Connect to Sybase
-isql -U sa -P password -S localhost:5000
+isql -U sa -P StrongPass1 -S localhost:5000
 
-use testdb
-go
-
-create table employees (
-    id int primary key,
-    name varchar(100),
-    dept varchar(50),
-    salary numeric(10,2),
-    updated_at datetime default getdate()
-)
-go
-
-insert into employees (id, name, dept, salary) values
-(1, 'Alice', 'HR', 55000.00),
-(2, 'Bob', 'IT', 75000.00),
-(3, 'Charlie', 'Finance', 62000.00)
-go
+-- Run setup script
+source sybase_setup.sql
 ```
 
----
+### PostgreSQL Setup
 
-## **3. Extract Data from Sybase (Python test)**
+```bash
+# Connect to PostgreSQL
+psql -h localhost -U postgres -d postgres
 
-We’ll use **pyodbc** for Sybase.
-
-```python
-import pyodbc
-import psycopg2
-
-# Sybase connection
-sybase_conn = pyodbc.connect("DRIVER={FreeTDS};SERVER=localhost;PORT=5000;UID=sa;PWD=password;DATABASE=testdb")
-syb_cur = sybase_conn.cursor()
-
-# Postgres connection
-pg_conn = psycopg2.connect("host=localhost dbname=testdb user=postgres password=StrongPass2")
-pg_cur = pg_conn.cursor()
-
-# Create same table in Postgres
-pg_cur.execute("""
-CREATE TABLE IF NOT EXISTS employees (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    dept VARCHAR(50),
-    salary NUMERIC(10,2),
-    updated_at TIMESTAMP DEFAULT NOW()
-)
-""")
-pg_conn.commit()
-
-# Fetch from Sybase
-syb_cur.execute("SELECT id, name, dept, salary, updated_at FROM employees")
-rows = syb_cur.fetchall()
-
-# Insert into Postgres
-for row in rows:
-    pg_cur.execute("""
-        INSERT INTO employees (id, name, dept, salary, updated_at)
-        VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT (id) DO UPDATE SET
-          name = EXCLUDED.name,
-          dept = EXCLUDED.dept,
-          salary = EXCLUDED.salary,
-          updated_at = EXCLUDED.updated_at
-    """, row)
-
-pg_conn.commit()
-print("Data migrated from Sybase → PostgreSQL successfully!")
-
-pg_cur.close()
-pg_conn.close()
-syb_cur.close()
-sybase_conn.close()
+# Run setup script
+\i postgres_setup.sql
 ```
 
----
+## Migration Process
 
-## **4. Verify Migration**
+### 1. Schema Migration
 
-In PostgreSQL:
+The system automatically:
+- Analyzes Sybase table structure
+- Converts data types to PostgreSQL equivalents
+- Creates tables with proper constraints
+
+### 2. Data Migration
+
+- Extracts data from Sybase in configurable batches
+- Inserts/updates data in PostgreSQL using UPSERT
+- Handles conflicts gracefully
+- Provides detailed logging and progress tracking
+
+### 3. Incremental Sync
+
+- Monitors `updated_at` timestamp column
+- Syncs only changed records
+- Maintains data consistency between databases
+
+### 4. Verification
+
+- Compares row counts between databases
+- Validates data integrity
+- Reports migration status
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file with:
 
 ```bash
 # Sybase Configuration

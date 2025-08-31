@@ -1,27 +1,24 @@
 #!/usr/bin/env python3
 """
 Scheduled Synchronization Script
-This script runs continuously to keep PostgreSQL synchronized with Sybase changes.
-It can be run as a service or scheduled task.
+This script runs continuous synchronization between Sybase and PostgreSQL
 """
 
 import logging
+import sys
 import time
 import schedule
-import signal
-import sys
 from datetime import datetime
-from database_connections import DatabaseConnections
 from data_migration import DataMigration
 from config import MIGRATION_CONFIG
 
-# Global flag for graceful shutdown
-running = True
-
+# Configure logging
 def setup_logging():
     """Setup logging configuration"""
+    log_level = getattr(logging, MIGRATION_CONFIG['log_level'].upper())
+    
     logging.basicConfig(
-        level=getattr(logging, MIGRATION_CONFIG['log_level'].upper()),
+        level=log_level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
             logging.FileHandler('sync.log'),
@@ -29,27 +26,15 @@ def setup_logging():
         ]
     )
 
-def signal_handler(signum, frame):
-    """Handle shutdown signals gracefully"""
-    global running
-    logger = logging.getLogger(__name__)
-    logger.info(f"Received signal {signum}, shutting down gracefully...")
-    running = False
-
 def sync_job():
-    """Main synchronization job"""
+    """Job function to run synchronization"""
     logger = logging.getLogger(__name__)
-    logger.info("Starting scheduled synchronization job...")
+    logger.info("=" * 40)
+    logger.info(f"Starting scheduled sync at {datetime.now()}")
+    logger.info("=" * 40)
     
     try:
-        # Initialize components
-        db_connections = DatabaseConnections()
         data_migration = DataMigration()
-        
-        # Test connections
-        if not db_connections.test_connections():
-            logger.error("Database connection test failed, skipping sync")
-            return False
         
         # Sync employees table
         if data_migration.incremental_sync('employees'):
@@ -57,66 +42,44 @@ def sync_job():
         else:
             logger.error("✗ Employees table sync failed")
         
-        # Close connections
-        db_connections.close_all()
+        # Add more tables here as needed
+        # if data_migration.incremental_sync('other_table'):
+        #     logger.info("✓ Other table sync completed successfully")
+        # else:
+        #     logger.error("✗ Other table sync failed")
         
-        logger.info("Synchronization job completed")
-        return True
+        logger.info("=" * 40)
+        logger.info(f"Scheduled sync completed at {datetime.now()}")
+        logger.info("=" * 40)
         
     except Exception as e:
-        logger.error(f"Synchronization job failed: {e}")
-        return False
-
-def run_scheduler():
-    """Run the scheduler"""
-    logger = logging.getLogger(__name__)
-    
-    # Schedule sync job
-    interval_minutes = MIGRATION_CONFIG['sync_interval_minutes']
-    schedule.every(interval_minutes).minutes.do(sync_job)
-    
-    logger.info(f"Scheduler started - sync every {interval_minutes} minutes")
-    logger.info("Press Ctrl+C to stop")
-    
-    # Run initial sync
-    sync_job()
-    
-    # Main loop
-    while running:
-        try:
-            schedule.run_pending()
-            time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Received keyboard interrupt, shutting down...")
-            break
-        except Exception as e:
-            logger.error(f"Scheduler error: {e}")
-            time.sleep(5)  # Wait before retrying
-    
-    logger.info("Scheduler stopped")
+        logger.error(f"Scheduled sync failed: {e}")
 
 def main():
-    """Main function"""
+    """Main function to run scheduled synchronization"""
     setup_logging()
     logger = logging.getLogger(__name__)
     
-    # Setup signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    logger.info("Starting scheduled synchronization service...")
+    logger.info(f"Sync interval: {MIGRATION_CONFIG['sync_interval_minutes']} minutes")
     
-    logger.info("=" * 50)
-    logger.info("Sybase to PostgreSQL Synchronization Service")
-    logger.info("=" * 50)
+    # Schedule the sync job
+    schedule.every(MIGRATION_CONFIG['sync_interval_minutes']).minutes.do(sync_job)
     
+    # Run initial sync
+    logger.info("Running initial sync...")
+    sync_job()
+    
+    # Keep the script running
     try:
-        run_scheduler()
+        while True:
+            schedule.run_pending()
+            time.sleep(60)  # Check every minute
+            
+    except KeyboardInterrupt:
+        logger.info("Scheduled sync service stopped by user")
     except Exception as e:
-        logger.error(f"Service failed: {e}")
-        return False
-    
-    logger.info("Service stopped gracefully")
-    return True
+        logger.error(f"Scheduled sync service failed: {e}")
 
 if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1) 
+    main() 

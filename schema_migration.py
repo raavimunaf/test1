@@ -48,6 +48,7 @@ class SchemaMigration:
     
     def create_table_postgres(self, table_name, columns_sql):
         """Create table in PostgreSQL"""
+        conn = None
         try:
             conn = self.db_connections.get_postgres_connection()
             cursor = conn.cursor()
@@ -61,15 +62,15 @@ class SchemaMigration:
             
             conn.commit()
             cursor.close()
-            self.db_connections.return_postgres_connection(conn)
             logger.info(f"✓ Table {table_name} created in PostgreSQL successfully")
             return True
             
         except Exception as e:
             logger.error(f"Failed to create table {table_name} in PostgreSQL: {e}")
+            return False
+        finally:
             if conn:
                 self.db_connections.return_postgres_connection(conn)
-            return False
     
     def migrate_employees_schema(self):
         """Migrate the employees table schema to PostgreSQL"""

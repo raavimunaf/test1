@@ -5,8 +5,6 @@
 IF NOT EXISTS (SELECT * FROM master.dbo.sysdatabases WHERE name = 'testdb')
 BEGIN
     CREATE DATABASE testdb
-    ON DEFAULT = 10
-    LOG ON DEFAULT = 5
 END
 GO
 
@@ -19,9 +17,9 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U')
 BEGIN
     CREATE TABLE employees (
         id int primary key,
-        name varchar(100) NOT NULL,
-        dept varchar(50) NOT NULL,
-        salary numeric(10,2) NOT NULL,
+        name varchar(100),
+        dept varchar(50),
+        salary numeric(10,2),
         updated_at datetime default getdate()
     )
 END
@@ -37,17 +35,8 @@ BEGIN
 END
 GO
 
--- Verify data
+-- Verify the setup
+SELECT 'Database setup completed successfully' as status
+SELECT COUNT(*) as employee_count FROM employees
 SELECT * FROM employees
-GO
-
--- Create index on updated_at for better incremental sync performance
-IF NOT EXISTS (SELECT * FROM sysindexes WHERE name = 'idx_employees_updated_at')
-BEGIN
-    CREATE INDEX idx_employees_updated_at ON employees(updated_at)
-END
-GO
-
--- Show table structure
-sp_help employees
 GO 

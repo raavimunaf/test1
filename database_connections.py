@@ -1,6 +1,6 @@
 import pyodbc
-import psycopg
-from psycopg_pool import ConnectionPool
+import psycopg2
+from psycopg2 import pool
 import logging
 from config import SYBASE_CONFIG, POSTGRES_CONFIG
 
@@ -24,18 +24,18 @@ class DatabaseConnections:
                 f"password={POSTGRES_CONFIG['password']}"
             )
             target_db = POSTGRES_CONFIG['dbname']
-            with psycopg.connect(admin_dsn, autocommit=True) as conn:
+            with psycopg2.connect(admin_dsn, autocommit=True) as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (target_db,))
                     if cur.fetchone() is None:
-                        cur.execute(f"CREATE DATABASE {psycopg.sql.Identifier(target_db).as_string(cur)}")
+                        cur.execute(f"CREATE DATABASE {target_db}")
                         logger.info(f"Created PostgreSQL database '{target_db}'")
         except Exception as e:
             # Non-fatal; pool creation may still fail which will be reported
             logger.warning(f"Could not ensure PostgreSQL database exists: {e}")
     
     def _setup_postgres_pool(self):
-        """Setup PostgreSQL connection pool (psycopg3)"""
+        """Setup PostgreSQL connection pool (psycopg2)"""
         try:
             dsn = (
                 f"host={POSTGRES_CONFIG['host']} "
@@ -44,7 +44,7 @@ class DatabaseConnections:
                 f"user={POSTGRES_CONFIG['user']} "
                 f"password={POSTGRES_CONFIG['password']}"
             )
-            self.postgres_pool = ConnectionPool(conninfo=dsn, min_size=1, max_size=10)
+            self.postgres_pool = pool.SimpleConnectionPool(1, 10, dsn)
             logger.info("PostgreSQL connection pool created successfully")
         except Exception as e:
             logger.error(f"Failed to create PostgreSQL connection pool: {e}")
@@ -101,7 +101,7 @@ class DatabaseConnections:
                 logger.info("Sybase connection closed")
             
             if self.postgres_pool:
-                self.postgres_pool.close()
+                self.postgres_pool.closeall()
                 logger.info("PostgreSQL connection pool closed")
         except Exception as e:
             logger.error(f"Error closing connections: {e}")

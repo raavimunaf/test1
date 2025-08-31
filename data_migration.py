@@ -12,6 +12,8 @@ class DataMigration:
     
     def migrate_employees_data(self):
         """Migrate data from Sybase employees table to PostgreSQL"""
+        syb_conn = None
+        pg_conn = None
         try:
             # Get connections
             syb_conn = self.db_connections.get_sybase_connection()
@@ -63,8 +65,6 @@ class DataMigration:
             
             # Close cursors
             syb_cur.close()
-            pg_cur.close()
-            self.db_connections.return_postgres_connection(pg_conn)
             
             logger.info(f"Migration completed: {success_count} successful, {error_count} failed")
             return error_count == 0
@@ -72,6 +72,10 @@ class DataMigration:
         except Exception as e:
             logger.error(f"Data migration failed: {e}")
             return False
+        finally:
+            # Ensure connections are properly closed/returned
+            if pg_conn:
+                self.db_connections.return_postgres_connection(pg_conn)
     
     def sync_table_data(self, table_name, key_column='id'):
         """Generic method to sync table data from Sybase to PostgreSQL"""
