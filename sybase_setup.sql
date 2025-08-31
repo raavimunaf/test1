@@ -1,5 +1,5 @@
 -- Sybase Database Setup Script
--- Connect to Sybase using: isql -U sa -P StrongPass1 -S localhost:5000
+-- Connect to Sybase using: isql -U sa -P password -S localhost:5000
 
 -- Create database if it doesn't exist
 IF NOT EXISTS (SELECT * FROM master.dbo.sysdatabases WHERE name = 'testdb')

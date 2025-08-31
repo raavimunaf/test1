@@ -5,7 +5,7 @@
 
 ```sql
 -- Connect to Sybase
-isql -U sa -P StrongPass1 -S localhost:5000
+isql -U sa -P password -S localhost:5000
 
 use testdb
 go
@@ -37,7 +37,7 @@ import pyodbc
 import psycopg2
 
 # Sybase connection
-sybase_conn = pyodbc.connect("DRIVER={FreeTDS};SERVER=localhost;PORT=5000;UID=sa;PWD=StrongPass1;DATABASE=testdb")
+sybase_conn = pyodbc.connect("DRIVER={FreeTDS};SERVER=localhost;PORT=5000;UID=sa;PWD=password;DATABASE=testdb")
 syb_cur = sybase_conn.cursor()
 
 # Postgres connection

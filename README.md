@@ -53,7 +53,7 @@ A comprehensive Python-based solution for migrating data from Sybase to PostgreS
 
 ```bash
 # Connect to Sybase
-isql -U sa -P StrongPass1 -S localhost:5000
+isql -U sa -P password -S localhost:5000
 
 # Run the setup script
 source sybase_setup.sql
@@ -140,7 +140,7 @@ Create a `.env` file based on `env_example.txt`:
 SYBASE_SERVER=localhost
 SYBASE_PORT=5000
 SYBASE_UID=sa
-SYBASE_PWD=StrongPass1
+SYBASE_PWD=password
 SYBASE_DB=testdb
 
 # PostgreSQL Configuration

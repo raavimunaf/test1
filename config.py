@@ -6,13 +6,12 @@ load_dotenv()
 
 # Sybase Configuration
 SYBASE_CONFIG = {
-    'driver': os.getenv('SYBASE_DRIVER', 'FreeTDS'),
-    'server': os.getenv('SYBASE_SERVER', 'localhost'),
+    'driver': os.getenv('SYBASE_DRIVER', 'Adaptive Server Enterprise'),
+    'server': os.getenv('SYBASE_SERVER', 'DESKTOP-NM4NO11'),
     'port': os.getenv('SYBASE_PORT', '5000'),
     'uid': os.getenv('SYBASE_UID', 'sa'),
-    'pwd': os.getenv('SYBASE_PWD', 'StrongPass1'),
-    'database': os.getenv('SYBASE_DB', 'testdb'),
-    'tds_version': os.getenv('SYBASE_TDS_VERSION', '7.4'),
+    'pwd': os.getenv('SYBASE_PWD', 'password'),
+    'database': os.getenv('SYBASE_DB', 'testdb')
 }
 
 # PostgreSQL Configuration
