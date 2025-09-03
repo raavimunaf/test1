@@ -14,32 +14,50 @@ class SchemaMigration:
             conn = self.db_connections.get_sybase_connection()
             cursor = conn.cursor()
             
-            # Create table
-            create_table_sql = """
-            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employees' AND xtype='U')
-            CREATE TABLE employees (
-                id int primary key,
-                name varchar(100),
-                dept varchar(50),
-                salary numeric(10,2),
-                updated_at datetime default getdate()
-            )
-            """
-            cursor.execute(create_table_sql)
+            # Check if table exists using a simpler approach
+            cursor.execute("SELECT COUNT(*) FROM sysobjects WHERE name = 'employees'")
+            table_exists = cursor.fetchone()[0] > 0
             
-            # Insert sample data
-            insert_data_sql = """
-            IF NOT EXISTS (SELECT * FROM employees WHERE id = 1)
-            INSERT INTO employees (id, name, dept, salary) VALUES
-            (1, 'Alice', 'HR', 55000.00),
-            (2, 'Bob', 'IT', 75000.00),
-            (3, 'Charlie', 'Finance', 62000.00)
-            """
-            cursor.execute(insert_data_sql)
+            if not table_exists:
+                # Create table
+                create_table_sql = """
+                CREATE TABLE employees (
+                    id int primary key,
+                    name varchar(100),
+                    dept varchar(50),
+                    salary numeric(10,2),
+                    updated_at datetime default getdate()
+                )
+                """
+                cursor.execute(create_table_sql)
+                logger.info("✓ Employees table created in Sybase")
+            else:
+                logger.info("✓ Employees table already exists in Sybase")
+            
+            # Check if table has data
+            cursor.execute("SELECT COUNT(*) FROM employees")
+            row_count = cursor.fetchone()[0]
+            
+            if row_count == 0:
+                # Insert sample data (Sybase ASE doesn't support multi-row INSERT)
+                sample_data = [
+                    (1, 'Alice', 'HR', 55000.00),
+                    (2, 'Bob', 'IT', 75000.00),
+                    (3, 'Charlie', 'Finance', 62000.00)
+                ]
+                
+                for id, name, dept, salary in sample_data:
+                    cursor.execute(
+                        "INSERT INTO employees (id, name, dept, salary) VALUES (?, ?, ?, ?)",
+                        (id, name, dept, salary)
+                    )
+                logger.info("✓ Sample data inserted in Sybase")
+            else:
+                logger.info(f"✓ Employees table already has {row_count} rows")
             
             conn.commit()
             cursor.close()
-            logger.info("✓ Sample table created in Sybase successfully")
+            logger.info("✓ Sample table setup in Sybase completed successfully")
             return True
             
         except Exception as e:

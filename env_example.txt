@@ -1,11 +1,10 @@
 # Sybase Configuration
-SYBASE_DRIVER=FreeTDS
+SYBASE_DRIVER=Adaptive Server Enterprise
 SYBASE_SERVER=localhost
 SYBASE_PORT=5000
 SYBASE_UID=sa
 SYBASE_PWD=StrongPass1
 SYBASE_DB=testdb
-SYBASE_TDS_VERSION=7.4
 
 # PostgreSQL Configuration
 PG_HOST=localhost

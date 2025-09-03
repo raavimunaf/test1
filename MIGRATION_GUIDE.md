@@ -89,13 +89,12 @@ Create a `.env` file with:
 
 ```bash
 # Sybase Configuration
-SYBASE_DRIVER=FreeTDS
+SYBASE_DRIVER=Adaptive Server Enterprise
 SYBASE_SERVER=localhost
 SYBASE_PORT=5000
 SYBASE_UID=sa
 SYBASE_PWD=StrongPass1
 SYBASE_DB=testdb
-SYBASE_TDS_VERSION=7.4
 
 # PostgreSQL Configuration
 PG_HOST=localhost
@@ -143,7 +142,7 @@ python backup_restore.py --restore backup_file.dump --crash-safe --sections pre-
 1. **Connection Errors**
    - Verify database credentials in `.env`
    - Check network connectivity
-   - Ensure FreeTDS is properly configured
+   - Ensure Sybase ASE client is properly installed and configured
 
 2. **Data Type Conversion Issues**
    - Review type mapping in `schema_migration.py`

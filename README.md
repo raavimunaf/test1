@@ -42,10 +42,10 @@ A comprehensive Python-based solution for migrating data from Sybase to PostgreS
    nano .env
    ```
 
-4. **Install FreeTDS driver (for Sybase connectivity):**
-   - **Windows**: Download from [FreeTDS website](https://www.freetds.org/)
-   - **Linux**: `sudo apt-get install freetds-dev` (Ubuntu/Debian)
-   - **macOS**: `brew install freetds`
+4. **Install Sybase ASE driver (for Sybase connectivity):**
+   - **Windows**: Install Sybase ASE client or use the built-in "Adaptive Server Enterprise" driver
+   - **Linux**: Install Sybase ASE client libraries
+   - **macOS**: Install Sybase ASE client libraries
 
 ## 🗄️ Database Setup
 
@@ -210,7 +210,7 @@ If any step fails, you can resume from that point without losing progress.
 1. **Connection Errors**
    - Verify database credentials
    - Check network connectivity
-   - Ensure FreeTDS is properly configured
+   - Ensure Sybase ASE client is properly installed and configured
 
 2. **Data Type Conversion Issues**
    - Review the type mapping in `schema_migration.py`

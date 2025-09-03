@@ -24,12 +24,14 @@ class DatabaseConnections:
                 f"password={POSTGRES_CONFIG['password']}"
             )
             target_db = POSTGRES_CONFIG['dbname']
-            with psycopg2.connect(admin_dsn, autocommit=True) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (target_db,))
-                    if cur.fetchone() is None:
-                        cur.execute(f"CREATE DATABASE {target_db}")
-                        logger.info(f"Created PostgreSQL database '{target_db}'")
+            conn = psycopg2.connect(admin_dsn)
+            conn.autocommit = True
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (target_db,))
+                if cur.fetchone() is None:
+                    cur.execute(f"CREATE DATABASE {target_db}")
+                    logger.info(f"Created PostgreSQL database '{target_db}'")
+            conn.close()
         except Exception as e:
             # Non-fatal; pool creation may still fail which will be reported
             logger.warning(f"Could not ensure PostgreSQL database exists: {e}")
@@ -51,10 +53,9 @@ class DatabaseConnections:
             raise
     
     def get_sybase_connection(self):
-        """Get Sybase connection (pyodbc + FreeTDS)"""
+        """Get Sybase connection (pyodbc + ASE driver)"""
         try:
             if self.sybase_conn is None or self.sybase_conn.closed:
-                tds_part = f";TDS_Version={SYBASE_CONFIG['tds_version']}" if SYBASE_CONFIG.get('tds_version') else ""
                 connection_string = (
                     f"DRIVER={{{SYBASE_CONFIG['driver']}}};"
                     f"SERVER={SYBASE_CONFIG['server']};"
@@ -62,10 +63,9 @@ class DatabaseConnections:
                     f"UID={SYBASE_CONFIG['uid']};"
                     f"PWD={SYBASE_CONFIG['pwd']};"
                     f"DATABASE={SYBASE_CONFIG['database']}"
-                    f"{tds_part}"
                 )
                 self.sybase_conn = pyodbc.connect(connection_string)
-                logger.info("Sybase connection established successfully")
+                logger.info("Sybase connection established successfully using ASE driver")
             
             return self.sybase_conn
         except Exception as e:

@@ -7,7 +7,7 @@ load_dotenv()
 # Sybase Configuration
 SYBASE_CONFIG = {
     'driver': os.getenv('SYBASE_DRIVER', 'Adaptive Server Enterprise'),
-    'server': os.getenv('SYBASE_SERVER', 'DESKTOP-NM4NO11'),
+    'server': os.getenv('SYBASE_SERVER', 'localhost'),
     'port': os.getenv('SYBASE_PORT', '5000'),
     'uid': os.getenv('SYBASE_UID', 'sa'),
     'pwd': os.getenv('SYBASE_PWD', 'password'),

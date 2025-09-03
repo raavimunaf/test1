@@ -30,7 +30,27 @@ REM Install dependencies if needed
 echo Checking dependencies...
 pip install -r requirements.txt
 
-REM Run test setup first
+REM Test ASE connection first
+echo.
+echo Testing ASE driver connection...
+python test_ase_connection.py
+if errorlevel 1 (
+    echo ASE connection test failed. Please check your Sybase configuration.
+    pause
+    exit /b 1
+)
+
+REM Setup PostgreSQL database
+echo.
+echo Setting up PostgreSQL database...
+python setup_postgres_db.py
+if errorlevel 1 (
+    echo PostgreSQL setup failed. Please check your PostgreSQL configuration.
+    pause
+    exit /b 1
+)
+
+REM Run test setup
 echo.
 echo Running test setup...
 python test_setup.py
@@ -52,5 +72,9 @@ if errorlevel 1 (
 
 echo.
 echo Migration completed successfully!
-echo You can now run scheduled sync with: python scheduled_sync.py
+echo.
+echo Starting scheduled sync service...
+echo Press Ctrl+C to stop the sync service
+echo.
+python scheduled_sync.py
 pause 

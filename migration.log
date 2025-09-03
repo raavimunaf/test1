@@ -1,0 +1,26 @@
+2025-09-03 10:59:49,004 - __main__ - INFO - ============================================================
+2025-09-03 10:59:49,004 - __main__ - INFO - Starting Sybase to PostgreSQL Migration
+2025-09-03 10:59:49,004 - __main__ - INFO - ============================================================
+2025-09-03 10:59:49,004 - database_connections - WARNING - Could not ensure PostgreSQL database exists: invalid dsn: invalid connection option "autocommit"
+
+2025-09-03 10:59:53,154 - database_connections - ERROR - Failed to create PostgreSQL connection pool: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2025-09-03 10:59:53,160 - __main__ - ERROR - Migration failed with error: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2025-09-03 10:59:53,160 - __main__ - ERROR - Error closing connections: local variable 'db_connections' referenced before assignment
+2025-09-03 11:21:22,234 - __main__ - INFO - ============================================================
+2025-09-03 11:21:22,234 - __main__ - INFO - Starting Sybase to PostgreSQL Migration
+2025-09-03 11:21:22,234 - __main__ - INFO - ============================================================
+2025-09-03 11:21:22,234 - database_connections - WARNING - Could not ensure PostgreSQL database exists: invalid dsn: invalid connection option "autocommit"
+
+2025-09-03 11:21:22,302 - database_connections - ERROR - Failed to create PostgreSQL connection pool: connection to server at "localhost" (::1), port 5432 failed: FATAL:  database "testdb" does not exist
+
+2025-09-03 11:21:22,302 - __main__ - ERROR - Migration failed with error: connection to server at "localhost" (::1), port 5432 failed: FATAL:  database "testdb" does not exist
+
+2025-09-03 11:21:22,303 - __main__ - ERROR - Error closing connections: local variable 'db_connections' referenced before assignment

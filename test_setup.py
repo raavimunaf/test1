@@ -30,7 +30,7 @@ def test_environment():
     logger.info(f"Python version: {sys.version}")
     
     # Test required packages
-    required_packages = ['pyodbc', 'psycopg2', 'python-dotenv', 'schedule']
+    required_packages = ['pyodbc', 'psycopg2', 'dotenv', 'schedule']
     missing_packages = []
     
     for package in required_packages:
