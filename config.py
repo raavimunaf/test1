@@ -19,7 +19,7 @@ POSTGRES_CONFIG = {
     'host': os.getenv('PG_HOST', 'localhost'),
     'dbname': os.getenv('PG_DB', 'testdb'),
     'user': os.getenv('PG_USER', 'postgres'),
-    'password': os.getenv('PG_PASSWORD', 'StrongPass2'),
+    'password': os.getenv('PG_PASSWORD', 'password'),
     'port': os.getenv('PG_PORT', '5432')
 }
 
