@@ -29,4 +29,15 @@ MIGRATION_CONFIG = {
     'sync_interval_minutes': int(os.getenv('SYNC_INTERVAL_MINUTES', '5')),
     'log_level': os.getenv('LOG_LEVEL', 'INFO'),
     'enable_logging': os.getenv('ENABLE_LOGGING', 'true').lower() == 'true'
+}
+
+# Bulk Migration Settings
+BULK_MIGRATION_CONFIG = {
+    'bulk_batch_size': int(os.getenv('BULK_BATCH_SIZE', '10000')),
+    'max_records_per_test': int(os.getenv('MAX_RECORDS_PER_TEST', '1000000')),
+    'performance_monitoring': os.getenv('PERFORMANCE_MONITORING', 'true').lower() == 'true',
+    'memory_threshold_mb': int(os.getenv('MEMORY_THRESHOLD_MB', '2048')),
+    'cpu_threshold_percent': int(os.getenv('CPU_THRESHOLD_PERCENT', '80')),
+    'enable_parallel_processing': os.getenv('ENABLE_PARALLEL_PROCESSING', 'false').lower() == 'true',
+    'parallel_workers': int(os.getenv('PARALLEL_WORKERS', '4'))
 } 
